@@ -103,16 +103,18 @@ def update_login(user_id):
     status = "fail"
     try:
         if (request.method == 'POST'):
-            data = request.get_json()
-            sign_update = SignupValidate(data["new_password"])
+            req = request.get_json()
+            sign_update = SignupValidate(req["new_password"])
+
             res = mongo.db.users.update_one(
                 {"_id": ObjectId(user_id)},
                 { "$set":
-                    {'title': sign_update.get_password_hash(),
+                    {'password': sign_update.get_password_hash(),
                      'created': datetime.now()
                      }
                 }
             )
+
             if res:
                 message = "updated successfully"
                 status = "successful"
@@ -142,7 +144,6 @@ def update_login(user_id):
 
 
 # Class
-
 class SignupValidate:
     def __init__(self, password):
         self.password = password
