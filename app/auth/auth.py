@@ -4,6 +4,8 @@
 from flask import jsonify, request
 import jwt
 from datetime import datetime, timedelta
+from bson import ObjectId
+from functools import wraps
 
 # App
 from app.extensions import mongo , bcrypt
@@ -27,13 +29,11 @@ def save_user():
             code = 401
             status = "fail"
         else:
-            # hashing the password so it's not stored in the db as it was
             password_hashed = SignupValidate(data['password'])
             #data['password'] = bcrypt.generate_password_hash(data['password']).decode('utf-8')
             data['password'] = password_hashed.get_password_hash()
             data['created'] = datetime.now()
 
-            #this is bad practice since the data is not being checked before insert
             res = mongo.db.users.insert_one(data)
             if res.acknowledged:
                 status = "successful"
@@ -94,6 +94,53 @@ def login():
     return jsonify({'status': status, "data": res_data, "message":message}), code
 
 
+# Endpoint to update login user with
+@auth.route('/update/<user_id>', methods=['GET','POST'])
+def update_login(user_id):
+    data = {}
+    code = 500
+    message = ""
+    status = "fail"
+    try:
+        if (request.method == 'POST'):
+            data = request.get_json()
+            sign_update = SignupValidate(data["new_password"])
+            res = mongo.db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                { "$set":
+                    {'title': sign_update.get_password_hash(),
+                     'created': datetime.now()
+                     }
+                }
+            )
+            if res:
+                message = "updated successfully"
+                status = "successful"
+                code = 201
+            else:
+                message = "update failed"
+                status = "fail"
+                code = 404
+        else:
+            data =  mongo.db.users.find_one({"_id": ObjectId(user_id)})
+            data['_id'] = str(data['_id'])
+
+            if data:
+                del data['password']
+                message = "item found"
+                status = "successful"
+                code = 200
+            else:
+                message = "update failed"
+                status = "fail"
+                code = 404
+    except Exception as ee:
+        message =  str(ee)
+        status = "Error"
+
+    return jsonify({"status": status, "message":message,'data': data}), code
+
+
 # Class
 
 class SignupValidate:
@@ -117,3 +164,17 @@ class TokenGenerate:
                         "exp": time
                     },config.SECRET_KEY)
         return token
+
+def tokenReq(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "Authorization" in request.headers:
+            token = request.headers["Authorization"]
+            try:
+                jwt.decode(token, config.SECRET_KEY)
+            except:
+                return jsonify({"status": "fail", "message": "unauthorized"}), 401
+            return f(*args, **kwargs)
+        else:
+            return jsonify({"status": "fail", "message": "unauthorized"}), 401
+    return decorated

@@ -38,7 +38,9 @@ def update_user(user_id):
         else:
             data =  mongo.db.users.find_one({"_id": ObjectId(user_id)})
             data['_id'] = str(data['_id'])
+            del data['password']
             if data:
+                response = data
                 message = "User found"
                 status = "successful"
                 code = 200
@@ -50,6 +52,53 @@ def update_user(user_id):
         message =  str(ee)
         status = "Error"
 
+    return jsonify({"status":status,'data': response, "message":message}), code
+
+
+@users.route('/get/<int:page>', methods=['GET'])
+def get_users(page):
+
+    page = int(request.args.get("page", 1))
+    per_page = 10  # A const value.
+
+    response = {}
+    data = []
+    code = 500
+    status = "fail"
+    message = ""
+    try:
+        users = mongo.db.users.find().skip(per_page * (page - 1)).limit(per_page)
+        users_count = users.count()
+
+        for user in users:
+            print(str(user["_id"]))
+            if user.get("user_profile") is None :
+                data.append({
+                    "id" : str(user["_id"]),
+                    "email" : user["email"],
+                    "user_profile" : []
+                })
+            else:
+                data.append({
+                    "id" : str(user["_id"]),
+                    "email" : user["email"],
+                    "user_profile" : user["user_profile"]
+                })
+            print(data)
+
+        response = {
+            "users": data,
+            "_count": users_count,
+        }
+
+        #response = [i for i in users]
+        #={str(value["_id"]) : value["user_profile"] for key,value  in users}
+        code = 200
+        status = "Successful"
+        message = "Get users successful"
+    except Exception as ee:
+        message =  str(ee)
+        status = "Error"
     return jsonify({"status":status,'data': response, "message":message}), code
 
 
