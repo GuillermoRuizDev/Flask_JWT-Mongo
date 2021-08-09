@@ -5,12 +5,13 @@ from flask import jsonify, request
 import jwt
 from datetime import datetime, timedelta
 from bson import ObjectId
-from functools import wraps
+
 
 # App
 from app.extensions import mongo , bcrypt
 from app.config import Config as config
 from app.auth import auth_blueprint as auth
+from app.auth.token_decorator import token_required
 
 
 #Endpoints
@@ -96,7 +97,9 @@ def login():
 
 # Endpoint to update login user with
 @auth.route('/update/<user_id>', methods=['GET','POST'])
+@token_required
 def update_login(user_id):
+    """ Endpoint update login user """
     data = {}
     code = 500
     message = ""
@@ -145,6 +148,7 @@ def update_login(user_id):
 
 # Class
 class SignupValidate:
+    """ Class for encrypt and validate password """
     def __init__(self, password):
         self.password = password
 
@@ -156,26 +160,14 @@ class SignupValidate:
 
 
 class TokenGenerate:
+    """ Class for generate token """
     def generate(user, time):
-        token = jwt.encode({
-                        "user": {
-                            "email": f"{user['email']}",
-                            "id": f"{user['_id']}",
-                        },
-                        "exp": time
-                    },config.SECRET_KEY)
-        return token
-
-def tokenReq(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "Authorization" in request.headers:
-            token = request.headers["Authorization"]
-            try:
-                jwt.decode(token, config.SECRET_KEY)
-            except:
-                return jsonify({"status": "fail", "message": "unauthorized"}), 401
-            return f(*args, **kwargs)
-        else:
-            return jsonify({"status": "fail", "message": "unauthorized"}), 401
-    return decorated
+        payload = {
+            "user": {
+                "email": f"{user['email']}",
+                "id": f"{user['_id']}",
+            },
+            "exp": time
+        }
+        new_token = jwt.encode(payload, config.SECRET_KEY,'HS256')
+        return new_token#.decode('utf-8')

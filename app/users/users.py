@@ -10,10 +10,11 @@ from bson import ObjectId
 from app.users import users_blueprint as users
 from app.extensions import mongo
 from app.utils import PhoneNumberValidation
-
+from app.auth.token_decorator import token_required
 
 # Endpoints
 @users.route('/update/<user_id>', methods=['GET','POST'])
+@token_required
 def update_user(user_id):
     """ Updated users profile for request """
     response = []
@@ -56,8 +57,9 @@ def update_user(user_id):
 
 
 @users.route('/get/<int:page>', methods=['GET'])
+@token_required
 def get_users(page):
-
+    """ Get Users for pages """
     page = int(request.args.get("page", 1))
     per_page = 10  # A const value.
 
